@@ -26,7 +26,8 @@ test:
 
 clean:
 	go clean
-	rm ${BIN}
+	rm -f ${BIN}
+	rm -f ${BIN}.exe
 
 package:
 	./scripts/package-mcschem.sh
