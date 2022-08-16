@@ -14,6 +14,10 @@ build:
 	mkdir -p dist/
 	${COMP_BIN} build -o "${BIN}" -ldflags="${LD_FLAGS}" "${MAIN}"
 
+build-win:
+	mkdir -p dist/
+	GOOS=windows ${COMP_BIN} build -o "${BIN}.exe" -ldflags="${LD_FLAGS}" "${MAIN}"
+
 run:
 	./${BIN}
 
