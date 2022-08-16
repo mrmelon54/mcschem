@@ -33,5 +33,5 @@ package:
 
 deb:
 	make clean && \
-	make all && \
+	make build && \
 	make package
