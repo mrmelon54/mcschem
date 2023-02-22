@@ -1,10 +1,15 @@
 package single_blocks
 
 import (
-	"compress/gzip"
+	"bytes"
 	"fmt"
-	structure2 "github.com/MrMelon54/mcschem/structure"
+	"github.com/MrMelon54/mcschem/marshall"
+	"github.com/MrMelon54/mcschem/region"
+	"github.com/MrMelon54/mcschem/structure"
+	"github.com/MrMelon54/mcschem/xyz"
 	"github.com/Tnze/go-mc/nbt"
+	"github.com/Tnze/go-mc/save"
+	"github.com/fatih/color"
 	"os"
 	"path"
 	"strings"
@@ -22,59 +27,111 @@ func Run(input, output string) {
 		fmt.Println(err)
 		os.Exit(1)
 	}
-	reader, err := gzip.NewReader(open)
+	var l *marshall.LitematicFormat
+	switch path.Ext(input) {
+	case ".litematic":
+		l, err = marshall.ParseLitematic(open)
+	case ".schem", ".schematic":
+		l, err = marshall.ParseSchematicToLitematic(open)
+	}
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("Failed to parse schematic: %s\n", err)
 		os.Exit(1)
 	}
-	decoder := nbt.NewDecoder(reader)
-
-	var data structure2.SchematicData
-	decode, err := decoder.Decode(&data)
-	if err != nil {
-		fmt.Println(err)
+	if l == nil {
+		fmt.Printf("Invalid format: '%s'\n", path.Ext(input))
 		os.Exit(1)
 	}
-	fmt.Printf("Tag name: %s\n", decode)
-	fmt.Printf("Size: %d %d %d\n", data.Width, data.Height, data.Length)
-
-	fmt.Println("Palette:")
-	for i := range data.Palette {
-		fmt.Printf("  - %s\n", i)
-	}
-	fmt.Println()
-	fmt.Println("Generating a separate schematic for each palette block")
-
-	blob := structure2.NewBlockDataBlob(data.Palette, data.BlockData, data.Width, data.Height, data.Length)
-	for i := range data.Palette {
-		oPalette, oBlockData, oWidth, oHeight, oLength := blob.SingleBlockData(i).Output()
-		out := data
-		out.Palette = oPalette
-		out.BlockData = oBlockData
-		out.Width = oWidth
-		out.Height = oHeight
-		out.Length = oLength
-		out.Metadata.Name = fmt.Sprintf("%s_%s", data.Metadata.Name, i)
-		baseName := path.Base(input)
-		blankName := strings.TrimSuffix(baseName, path.Ext(baseName))
-		safeName := fmt.Sprintf("%s-%s.schem", blankName, strings.ReplaceAll(i, ":", "_"))
-		create, err := os.Create(path.Join(output, safeName))
+	regions := l.ListRegions()
+	for _, i := range regions {
+		reg, err := l.GetRegion(i)
 		if err != nil {
-			fmt.Printf("Failed to output '%s': %s\n", i, err)
+			fmt.Printf("Failed to read region '%s': %s\n", i, err)
 			continue
 		}
-		writer := gzip.NewWriter(create)
-		encoder := nbt.NewEncoder(writer)
-		err = encoder.Encode(out, decode)
-		if err != nil {
-			fmt.Printf("Failed to encode '%s': %s\n", i, err)
-		}
-		err = writer.Close()
-		if err != nil {
-			fmt.Println("Failed to close gzip:", err)
-		}
+		extractRegionAsSingleBlocks(input, output, i, l.Data, reg)
 	}
 
 	fmt.Println("")
 	fmt.Println("Finished outputting schematics")
+}
+
+func extractRegionAsSingleBlocks(input, output, name string, meta structure.LitematicData, access *region.Access) {
+	fmt.Println("Palette:")
+	palette := access.Palette()
+	for i := range palette {
+		if palette[i].Properties.Type == 0 {
+			palette[i].Properties = nbt.RawMessage{Type: 0xa, Data: []byte{0}}
+		}
+		fmt.Printf("  - %s\n", stringifyBlockState(palette[i]))
+	}
+	fmt.Println()
+	fmt.Println("Generating a separate schematic for each palette block")
+
+	out := marshall.NewLitematic(meta.Version, meta.MinecraftDataVersion, meta.Metadata.Name, meta.Metadata.Description, meta.Metadata.Author)
+
+	for _, i := range palette {
+		strBlock := stringifyBlockState(i)
+		if i.Name == "minecraft:air" {
+			continue
+		}
+		singleBlockRegion, err := extractSinglePaletteBlock(access, i)
+		if err != nil {
+			fmt.Printf("Failed to extract block '%s': %s\n", strBlock, err)
+			continue
+		}
+		err = out.AddRegion(strBlock, singleBlockRegion)
+		if err != nil {
+			fmt.Printf("Failed to add region for block '%s': %s\n", strBlock, err)
+		}
+	}
+
+	baseName := path.Base(input)
+	blankName := strings.TrimSuffix(baseName, path.Ext(baseName))
+	safeName := fmt.Sprintf("%s-%s.litematic", blankName, name)
+	fullName := path.Join(output, safeName)
+
+	create, err := os.Create(fullName)
+	if err != nil {
+		fmt.Printf("Failed to create file '%s': %s\n", fullName, err)
+		return
+	}
+	out.CalculateMetadata()
+	err = out.Save(create)
+	if err != nil {
+		fmt.Printf("Failed to save litematic '%s': %s\n", fullName, err)
+		return
+	}
+}
+
+func extractSinglePaletteBlock(access *region.Access, i save.BlockState) (*region.Access, error) {
+	a, err := access.CloneEmpty()
+	if err != nil {
+		return nil, err
+	}
+	size := a.AbsSize()
+	a.ResetToMatchSize()
+	size.LoopAllBlocks(func(xyz xyz.XYZ) {
+		block := access.GetBlock(xyz)
+		if blockStatesEqual(block, i) {
+			fmt.Printf("%s Setting '%s' block at %v\n", color.HiBlueString("[extractSinglePaletteBlock()]"), i, xyz)
+			a.SetBlock(xyz, i)
+		}
+	})
+	return a, nil
+}
+
+func stringifyBlockState(i save.BlockState) string {
+	return fmt.Sprintf("%s%s", i.Name, i.Properties.String())
+}
+
+func blockStatesEqual(a save.BlockState, b save.BlockState) bool {
+	fmt.Printf("Comparing %#v\n          %#v\n", a, b)
+	if a.Name != b.Name {
+		return false
+	}
+	if a.Properties.Type != b.Properties.Type {
+		return false
+	}
+	return bytes.Equal(a.Properties.Data, a.Properties.Data)
 }
