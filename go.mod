@@ -1,4 +1,4 @@
-module github.com/MrMelon54/mcschem
+module github.com/mrmelon54/mcschem
 
 go 1.18
 

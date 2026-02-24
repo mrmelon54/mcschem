@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/MrMelon54/mcschem/modules/single-blocks"
+	"github.com/mrmelon54/mcschem/modules/single-blocks"
 	"os"
 )
 

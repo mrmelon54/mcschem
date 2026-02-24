@@ -2,9 +2,9 @@ package marshall
 
 import (
 	"errors"
-	"github.com/MrMelon54/mcschem/region"
-	"github.com/MrMelon54/mcschem/structure"
-	"github.com/MrMelon54/mcschem/xyz"
+	"github.com/mrmelon54/mcschem/region"
+	"github.com/mrmelon54/mcschem/structure"
+	"github.com/mrmelon54/mcschem/xyz"
 	"golang.org/x/exp/maps"
 	"io"
 	"time"

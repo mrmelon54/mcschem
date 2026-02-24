@@ -4,6 +4,6 @@
     "Section": "base",
     "Priority": "optional",
     "Architecture": "amd64",
-    "Maintainer": "MrMelon54 <github@onpointcoding.net>",
+    "Maintainer": "MrMelon54 <github@mrmelon54.com>",
     "Description": "Schematic tools"
 }

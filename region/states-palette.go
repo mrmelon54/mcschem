@@ -2,7 +2,7 @@ package region
 
 import (
 	"fmt"
-	"github.com/MrMelon54/mcschem/xyz"
+	"github.com/mrmelon54/mcschem/xyz"
 	"github.com/Tnze/go-mc/level/block"
 	"github.com/Tnze/go-mc/save"
 	"github.com/fatih/color"

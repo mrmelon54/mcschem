@@ -2,8 +2,8 @@ package region
 
 import (
 	"fmt"
-	"github.com/MrMelon54/mcschem/structure"
-	"github.com/MrMelon54/mcschem/xyz"
+	"github.com/mrmelon54/mcschem/structure"
+	"github.com/mrmelon54/mcschem/xyz"
 	"github.com/Tnze/go-mc/level"
 	"github.com/Tnze/go-mc/nbt"
 	"github.com/Tnze/go-mc/save"
